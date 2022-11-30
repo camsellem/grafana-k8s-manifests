@@ -1,0 +1,109 @@
+---
+# Source: enterprise-logs/templates/gateway/deployment-gateway.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-enterprise-logs-gateway
+  labels:
+    helm.sh/chart: enterprise-logs-2.4.2
+    app.kubernetes.io/name: enterprise-logs
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "v1.5.2"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: gateway
+    target: gateway
+  annotations:
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: enterprise-logs
+      app.kubernetes.io/instance: release-name
+      app.kubernetes.io/component: gateway
+      target: gateway
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: enterprise-logs
+        app.kubernetes.io/instance: release-name
+        app.kubernetes.io/component: gateway
+        target: gateway
+      annotations:
+        checksum/config: 74259670e52e4282a017bc33721d2322bc9eb5959309cf2468d3348bff05184d
+    spec:
+      serviceAccountName: release-name-enterprise-logs
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+      initContainers:
+        []
+      containers:
+        - name: gateway
+          image: "docker.io/grafana/enterprise-logs:v1.5.2"
+          imagePullPolicy: IfNotPresent
+          args:
+            - -target=gateway
+            - -config.file=/etc/loki/config/config.yaml
+            - -admin.client.backend-type=s3
+            - -admin.client.s3.endpoint=release-name-minio.default.svc:9000
+            - -admin.client.s3.bucket-name=enterprise-logs-admin
+            - -admin.client.s3.access-key-id=enterprise-logs
+            - -admin.client.s3.secret-access-key=supersecret
+            - -admin.client.s3.insecure=true
+            - -gateway.proxy.default.url=http://release-name-enterprise-logs-admin-api.default.svc:3100
+            - -gateway.proxy.admin-api.url=http://release-name-enterprise-logs-admin-api.default.svc:3100
+            - -gateway.proxy.distributor.url=http://release-name-enterprise-logs-distributor.default.svc:3100
+            - -gateway.proxy.ingester.url=http://release-name-enterprise-logs-ingester.default.svc:3100
+            - -gateway.proxy.query-frontend.url=http://release-name-enterprise-logs-query-frontend.default.svc:3100
+            - -gateway.proxy.ruler.url=http://release-name-enterprise-logs-ruler.default.svc:3100
+          volumeMounts:
+            - name: config
+              mountPath: /etc/loki/config
+            - name: license
+              mountPath: /etc/enterprise-logs/license
+            - name: storage
+              mountPath: /data
+              subPath: 
+          ports:
+            - name: http-metrics
+              containerPort: 3100
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: http-metrics
+            initialDelaySeconds: 45
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http-metrics
+            initialDelaySeconds: 45
+          resources:
+            {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          env:
+      nodeSelector:
+        {}
+      affinity:
+        {}
+      tolerations:
+        []
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: config
+          secret:
+            secretName: enterprise-logs-config
+        - name: license
+          secret:
+            secretName: enterprise-logs-license
+        - name: storage
+          emptyDir: {}

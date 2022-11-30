@@ -1,0 +1,31 @@
+---
+# Source: enterprise-logs/templates/admin-api/service-admin-api.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-enterprise-logs-admin-api
+  labels:
+    helm.sh/chart: enterprise-logs-2.4.2
+    app.kubernetes.io/name: enterprise-logs
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "v1.5.2"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admin-api
+    target: admin-api
+  annotations:
+spec:
+  type: ClusterIP
+  ports:
+    - name: http-metrics
+      port: 3100
+      protocol: TCP
+      targetPort: http-metrics
+    - name: grpc
+      port: 9095
+      protocol: TCP
+      targetPort: grpc
+  selector:
+    app.kubernetes.io/name: enterprise-logs
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/component: admin-api
+    target: admin-api

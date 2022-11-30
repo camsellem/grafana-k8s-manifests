@@ -1,0 +1,72 @@
+---
+# Source: enterprise-logs/charts/minio/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-minio
+  labels:
+    app: minio
+    chart: minio-8.0.9
+    release: release-name
+    heritage: Helm
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: minio
+      release: release-name
+  template:
+    metadata:
+      name: release-name-minio
+      labels:
+        app: minio
+        release: release-name
+      annotations:
+        checksum/secrets: 2493fcdaf0c74cb1fa28b5c92d87245fdcd60386a797e644ee667bda1798f098
+        checksum/config: d350cca14eabd4df312004ddd2648417c7eaaf8357e3dd5ce97bf60368674c83
+    spec:
+      serviceAccountName: "release-name-minio"
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: minio
+          image: "minio/minio:RELEASE.2020-12-03T05-49-24Z"
+          imagePullPolicy: IfNotPresent
+          command:
+            - "/bin/sh"
+            - "-ce"
+            - "/usr/bin/docker-entrypoint.sh minio -S /etc/minio/certs/ server /export"
+          volumeMounts:
+            - name: export
+              mountPath: /export            
+          ports:
+            - name: http
+              containerPort: 9000
+          env:
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: release-name-minio
+                  key: accesskey
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: release-name-minio
+                  key: secretkey
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi      
+      volumes:
+        - name: export
+          persistentVolumeClaim:
+            claimName: release-name-minio
+        - name: minio-user
+          secret:
+            secretName: release-name-minio

@@ -1,0 +1,22 @@
+---
+# Source: enterprise-logs/charts/loki-distributed/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: release-name-enterprise-logs
+  namespace: default
+  labels:
+    helm.sh/chart: loki-distributed-0.55.0
+    app.kubernetes.io/name: enterprise-logs
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "2.6.1"
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - policy
+    resources:
+      - podsecuritypolicies
+    verbs:
+      - use
+    resourceNames:
+      - release-name-enterprise-logs

@@ -1,0 +1,130 @@
+---
+# Source: enterprise-logs/templates/admin-api/deployment-admin-api.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-enterprise-logs-admin-api
+  labels:
+    helm.sh/chart: enterprise-logs-2.4.2
+    app.kubernetes.io/name: enterprise-logs
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "v1.5.2"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: admin-api
+    target: admin-api
+    app.kubernetes.io/part-of: memberlist
+  annotations:
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: enterprise-logs
+      app.kubernetes.io/instance: release-name
+      app.kubernetes.io/component: admin-api
+      target: admin-api
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: enterprise-logs
+        app.kubernetes.io/instance: release-name
+        app.kubernetes.io/component: admin-api
+        target: admin-api
+        app.kubernetes.io/part-of: memberlist
+      annotations:
+        checksum/config: 74259670e52e4282a017bc33721d2322bc9eb5959309cf2468d3348bff05184d
+    spec:
+      serviceAccountName: release-name-enterprise-logs
+      securityContext:
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+      initContainers:
+      # Taken from
+      # https://github.com/minio/charts/blob/a5c84bcbad884728bff5c9c23541f936d57a13b3/minio/templates/post-install-create-bucket-job.yaml
+        - name: minio-mc
+          image: "minio/mc:RELEASE.2020-11-25T23-04-07Z"
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "/config/initialize"]
+          env:
+            - name: MINIO_ENDPOINT
+              value: release-name-minio
+            - name: MINIO_PORT
+              value: "9000"
+          volumeMounts:
+            - name: minio-configuration
+              mountPath: /config
+      containers:
+        - name: admin-api
+          image: "docker.io/grafana/enterprise-logs:v1.5.2"
+          imagePullPolicy: IfNotPresent
+          args:
+            - -target=admin-api
+            - -config.file=/etc/loki/config/config.yaml
+            - -admin.client.backend-type=s3
+            - -admin.client.s3.endpoint=release-name-minio.default.svc:9000
+            - -admin.client.s3.bucket-name=enterprise-logs-admin
+            - -admin.client.s3.access-key-id=enterprise-logs
+            - -admin.client.s3.secret-access-key=supersecret
+            - -admin.client.s3.insecure=true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/loki/config
+            - name: license
+              mountPath: /etc/enterprise-logs/license
+            - name: storage
+              mountPath: /data
+              subPath: 
+          ports:
+            - name: http-metrics
+              containerPort: 3100
+              protocol: TCP
+            - name: grpc
+              containerPort: 9095
+              protocol: TCP
+            - name: http-memberlist
+              containerPort: 7946
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: http-metrics
+            initialDelaySeconds: 45
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http-metrics
+            initialDelaySeconds: 45
+          resources:
+            {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          env:
+      nodeSelector:
+        {}
+      affinity:
+        {}
+      tolerations:
+        []
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: config
+          secret:
+            secretName: enterprise-logs-config
+        - name: license
+          secret:
+            secretName: enterprise-logs-license
+        - name: storage
+          emptyDir: {}
+        - name: minio-configuration
+          projected:
+            sources:
+            - configMap:
+                name: release-name-minio
+            - secret:
+                name: release-name-minio

@@ -1,0 +1,118 @@
+---
+# Source: mimir-distributed/templates/overrides-exporter/overrides-exporter-dep.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    {}
+  labels:
+    helm.sh/chart: mimir-distributed-4.0.0-weekly.214
+    app.kubernetes.io/name: mimir
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/component: overrides-exporter
+    app.kubernetes.io/version: "r214"
+    app.kubernetes.io/managed-by: Helm
+  name: release-name-mimir-overrides-exporter
+  namespace: "default"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mimir
+      app.kubernetes.io/instance: release-name
+      app.kubernetes.io/component: overrides-exporter
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: mimir-distributed-4.0.0-weekly.214
+        app.kubernetes.io/name: mimir
+        app.kubernetes.io/instance: release-name
+        app.kubernetes.io/version: "r214"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: overrides-exporter
+      annotations:
+        checksum/config: 1062794b80f7c9abc33b8e3ba676f3b9629b8bb48203e90de4ac1ad3cc9ed66c
+      namespace: "default"
+    spec:
+      serviceAccountName: release-name-mimir
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        []
+      containers:
+        - name: overrides-exporter
+          image: "grafana/mimir:r214-2275d9b"
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-target=overrides-exporter"
+            - "-config.expand-env=true"
+            - "-config.file=/etc/mimir/mimir.yaml"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mimir
+            - name: runtime-config
+              mountPath: /var/mimir
+            - name: storage
+              mountPath: "/data"
+              subPath: 
+            - name: active-queries
+              mountPath: /active-query-tracker
+          ports:
+            - name: http-metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: grpc
+              containerPort: 9095
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: http-metrics
+            initialDelaySeconds: 45
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http-metrics
+            initialDelaySeconds: 45
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          env:
+          envFrom:
+      nodeSelector:
+        {}
+      affinity:
+        {}
+      topologySpreadConstraints:
+        
+      tolerations:
+        []
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: config
+          configMap:
+            name: release-name-mimir-config
+            items:
+              - key: "mimir.yaml"
+                path: "mimir.yaml"
+        - name: runtime-config
+          configMap:
+            name: release-name-mimir-runtime
+        - name: storage
+          emptyDir: {}
+        - name: active-queries
+          emptyDir: {}
